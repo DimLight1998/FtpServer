@@ -8,6 +8,7 @@ void PassCommandParser(char *command, char *password);
 void RetrCommandParser(char *command, char *pathName);
 void StorCommandParser(char *command, char *pathName);
 void PortCommandParser(char *command, struct sockaddr *address, int *addressLength);
+void TypeCommandParser(char *command, bool *isBinary);
 void MkdCommandParser(char *command, char *pathName);
 void CwdCommandParser(char *command, char *pathName);
 void PwdCommandParser(char *command, char *pathName);

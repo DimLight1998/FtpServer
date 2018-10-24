@@ -77,6 +77,18 @@ void PortCommandParser(char *command, struct sockaddr *address, int *addressLeng
     *addressLength = sizeof(remoteAddress);
 }
 
+void TypeCommandParser(char *command, bool *isBinary)
+{
+    int current = 4;
+    while (isspace(command[current]) && !IsCrLf(command[current]))
+        current++;
+
+    if ((command[current] == 'I' || command[current] == 'i') && isspace(command[current + 1]))
+        *isBinary = true;
+    else
+        *isBinary = false;
+}
+
 void MkdCommandParser(char *command, char *pathName)
 {
     PathParser(command + 3, pathName);

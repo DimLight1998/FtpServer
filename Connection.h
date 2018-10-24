@@ -44,4 +44,10 @@ void HandlerEntry(int connectionFd, const char *rootPath);
 // this function will return type of the command, and save the command in `commandBuffer`
 enum ClientCommand GetNextCommand(int connectionFd, char *commandBuffer, int bufferSize);
 
+void ReplyCommand(int connectionFd, int statusCode, char *message);
+bool VerifyUser(char *userName, char *password);
+
+bool IsSimpleCommand(enum ClientCommand command);
+void HandleSimpleCommand(enum ClientCommand command, char *commandDetail, int connectionFd);
+
 #endif
