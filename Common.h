@@ -11,5 +11,6 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <ctype.h>
 
 #endif
