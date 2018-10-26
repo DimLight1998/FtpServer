@@ -132,7 +132,30 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             }
             else if (command == MkdCommand)
             {
-                // TODO
+                char newPathRelative[pathSize];
+                strncpy(newPathRelative, currentPath, strlen(currentPath) + 1);
+
+                MkdCommandParser(incomingCommand, buffer);
+                ChangeDirectory(buffer, newPathRelative);
+
+                // now `newPathRelative` holds relative path
+                char absolutePath[2 * pathSize];
+                memset(absolutePath, 0, sizeof(absolutePath));
+                strncpy(absolutePath, rootPath, strlen(rootPath) + 1);
+                strncpy(absolutePath + strlen(absolutePath), newPathRelative, strlen(newPathRelative) + 1);
+
+                memset(buffer, 0, sizeof(buffer));
+                strcpy(buffer, "mkdir ");
+                strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
+
+                printf("[DEBUG] running %s\n", buffer);
+                fflush(stdout);
+
+                int retVal = system(buffer);
+                if (retVal == 0)
+                    ReplyCommand(connectionFd, 257, "Success");
+                else
+                    ReplyCommand(connectionFd, 550, "Cannot make directory");
             }
             else if (command == CwdCommand)
             {
