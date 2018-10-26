@@ -1,6 +1,7 @@
 #include "Common.h"
 #include "Connection.h"
 #include "CommandParsers.h"
+#include "FileSystem.h"
 
 void *ConnectionHandler(void *arg)
 {
@@ -135,8 +136,33 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             }
             else if (command == CwdCommand)
             {
+                char pathBackup[pathSize];
+                strncpy(pathBackup, currentPath, strlen(currentPath) + 1);
                 CwdCommandParser(incomingCommand, buffer);
-                // TODO
+                ChangeDirectory(buffer, currentPath);
+
+                char testCommand[2 * pathSize];
+                memset(testCommand, 0, sizeof(testCommand));
+                strcpy(testCommand, "test -d ");
+                strncpy(testCommand + strlen(testCommand), rootPath, strlen(rootPath) + 1);
+                strncpy(testCommand + strlen(testCommand), currentPath, strlen(currentPath) + 1);
+
+                printf("[DEBUG] running %s\n", testCommand);
+                fflush(stdout);
+
+                int retVal = system(testCommand);
+                if (retVal == 0)
+                {
+                    char *messageOk = "OK. Current directory is ";
+                    strncpy(buffer, messageOk, strlen(messageOk) + 1);
+                    strncpy(buffer + strlen(buffer), currentPath, strlen(currentPath) + 1);
+                    ReplyCommand(connectionFd, 250, buffer);
+                }
+                else
+                {
+                    ReplyCommand(connectionFd, 550, "Cannot change directory.");
+                    strncpy(currentPath, pathBackup, strlen(pathBackup) + 1);
+                }
             }
             else if (command == PwdCommand)
             {
@@ -167,14 +193,17 @@ void HandlerEntry(int connectionFd, const char *rootPath)
         }
         case WaitingForRenameTo:
         {
+            // TODO
             break;
         }
         case ReceivedPassive:
         {
+            // TODO
             break;
         }
         case ReceivedPort:
         {
+            // TODO
             break;
         }
         }
