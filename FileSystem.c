@@ -73,3 +73,23 @@ void SimplifyPath(char *path)
         path[1] = 0;
     }
 }
+
+void ListFolder(char *realPath, char *buffer)
+{
+    buffer[0] = 0;
+    char command[2048];
+    memset(command, 0, sizeof(command));
+    sprintf(command, "ls -l %s", realPath);
+    FILE *fp = popen(command, "r");
+    char line[1024];
+    while (fgets(line, sizeof(line), fp) != NULL)
+        strncpy(buffer + strlen(buffer), line, strlen(line) + 1);
+}
+
+void GetPathRelativeToRoot(char* currentPath, char* pathRelativeToCurrent, char* out)
+{
+    char buffer[4096];
+    strcpy(buffer, currentPath);
+    ChangeDirectory(pathRelativeToCurrent, buffer);
+    strcpy(out, buffer);
+}

@@ -31,6 +31,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
     // this buffer will be used in many places
     char buffer[2 * maxCommandLength];
+    char buffer32K[32 * 1024];
     enum ClientState clientState = WaitingForInputUserName;
 
     int passiveSocketFd;
@@ -157,6 +158,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 dataAddress.sin_addr.s_addr = htonl(INADDR_ANY);
                 dataAddress.sin_port = htons(0);
                 bind(passiveSocketFd, (struct sockaddr *)&dataAddress, sizeof(dataAddress));
+                listen(passiveSocketFd, 4);
                 passiveSocketBinded = true;
 
                 int dataPort = 0;
@@ -165,7 +167,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                     struct sockaddr_in dataAddressOut;
                     socklen_t sockLen;
                     getsockname(passiveSocketFd, (struct sockaddr *)&dataAddressOut, &sockLen);
-                    dataPort = dataAddressOut.sin_port;
+                    dataPort = ntohs(dataAddressOut.sin_port);
                 }
 
                 int bigPort = dataPort / 256;
@@ -335,12 +337,151 @@ void HandlerEntry(int connectionFd, const char *rootPath)
         }
         case ReceivedPassive:
         {
-            // TODO
+            if (command == ListCommand)
+            {
+                int dataConnectionFd = accept(passiveSocketFd, NULL, NULL);
+                ReplyCommand(connectionFd, 150, "Connected.");
+
+                ListCommandParser(incomingCommand, buffer);
+                char relativeToRoot[2048];
+                strcpy(relativeToRoot, currentPath);
+                if (buffer[0] != 0)
+                    ChangeDirectory(buffer, relativeToRoot);
+                sprintf(buffer, "%s%s", rootPath, relativeToRoot);
+                ListFolder(buffer, buffer32K);
+                write(dataConnectionFd, buffer32K, strlen(buffer32K));
+                close(dataConnectionFd);
+                passiveSocketBinded = false;
+                ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else if (command == StorCommand)
+            {
+                int dataConnectionFd = accept(passiveSocketFd, NULL, NULL);
+                ReplyCommand(connectionFd, 150, "Connected.");
+
+                StorCommandParser(incomingCommand, buffer);
+                char relativeToRoot[2048];
+                strcpy(relativeToRoot, currentPath);
+                ChangeDirectory(buffer, relativeToRoot);
+                sprintf(buffer, "%s%s", rootPath, relativeToRoot);
+
+                char readingBuffer[1024];
+                FILE *file = fopen(buffer, "w+");
+                int readSize;
+                while ((readSize = read(dataConnectionFd, readingBuffer, sizeof(readingBuffer))) > 0)
+                {
+                    write(fileno(file), readingBuffer, readSize);
+                }
+                fclose(file);
+                close(dataConnectionFd);
+                passiveSocketBinded = false;
+                ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else if (command == RetrCommand)
+            {
+                int dataConnectionFd = accept(passiveSocketFd, NULL, NULL);
+                ReplyCommand(connectionFd, 150, "Connected.");
+
+                RetrCommandParser(incomingCommand, buffer);
+                char relativeToRoot[2048];
+                strcpy(relativeToRoot, currentPath);
+                ChangeDirectory(buffer, relativeToRoot);
+                sprintf(buffer, "%s%s", rootPath, relativeToRoot);
+
+                char readingBuffer[1024];
+                FILE *file = fopen(buffer, "r");
+                int readSize;
+                while ((readSize = read(fileno(file), readingBuffer, sizeof(readingBuffer))) > 0)
+                {
+                    write(dataConnectionFd, readingBuffer, readSize);
+                }
+                fclose(file);
+                close(dataConnectionFd);
+                passiveSocketBinded = false;
+                ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else
+            {
+                char rep[2048];
+                sprintf(rep, "Unknown, connection dropped. Command is [%s].", incomingCommand);
+                ReplyCommand(connectionFd, 500, rep);
+            }
+            clientState = WaitingForCommand;
+
             break;
         }
         case ReceivedPort:
         {
-            // TODO
+            if (command == ListCommand)
+            {
+                ListCommandParser(incomingCommand, buffer);
+                char relativeToRoot[2048];
+                strcpy(relativeToRoot, currentPath);
+                if (buffer[0] != 0)
+                    ChangeDirectory(buffer, relativeToRoot);
+                sprintf(buffer, "%s%s", rootPath, relativeToRoot);
+                ListFolder(buffer, buffer32K);
+
+                int dataConnectionFd = socket(AF_INET, SOCK_STREAM, 0);
+                connect(dataConnectionFd, (struct sockaddr *)&clientAddress, sizeof(clientAddress));
+                ReplyCommand(connectionFd, 150, "Connected.");
+
+                write(dataConnectionFd, buffer32K, strlen(buffer32K));
+                close(dataConnectionFd);
+                ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else if (command == StorCommand)
+            {
+                StorCommandParser(incomingCommand, buffer);
+                char relativeToRoot[2048];
+                strcpy(relativeToRoot, currentPath);
+                ChangeDirectory(buffer, relativeToRoot);
+                sprintf(buffer, "%s%s", rootPath, relativeToRoot);
+
+                int dataConnectionFd = socket(AF_INET, SOCK_STREAM, 0);
+                connect(dataConnectionFd, (struct sockaddr *)&clientAddress, sizeof(clientAddress));
+                ReplyCommand(connectionFd, 150, "Connected.");
+
+                char readingBuffer[1024];
+                FILE *file = fopen(buffer, "w+");
+                int readSize;
+                while ((readSize = read(dataConnectionFd, readingBuffer, sizeof(readingBuffer))) > 0)
+                {
+                    write(fileno(file), readingBuffer, readSize);
+                }
+                fclose(file);
+                close(dataConnectionFd);
+                ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else if (command == RetrCommand)
+            {
+                RetrCommandParser(incomingCommand, buffer);
+                char relativeToRoot[2048];
+                strcpy(relativeToRoot, currentPath);
+                ChangeDirectory(buffer, relativeToRoot);
+                sprintf(buffer, "%s%s", rootPath, relativeToRoot);
+
+                int dataConnectionFd = socket(AF_INET, SOCK_STREAM, 0);
+                connect(dataConnectionFd, (struct sockaddr *)&clientAddress, sizeof(clientAddress));
+                ReplyCommand(connectionFd, 150, "Connected.");
+
+                char readingBuffer[1024];
+                FILE *file = fopen(buffer, "r");
+                int readSize;
+                while ((readSize = read(fileno(file), readingBuffer, sizeof(readingBuffer))) > 0)
+                {
+                    write(dataConnectionFd, readingBuffer, readSize);
+                }
+                fclose(file);
+                close(dataConnectionFd);
+                ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else
+            {
+                ReplyCommand(connectionFd, 500, "Unknown, connection dropped.");
+            }
+            clientState = WaitingForCommand;
+
             break;
         }
         }
