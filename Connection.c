@@ -301,7 +301,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 }
                 else
                 {
-                    ReplyCommand()
+                    ReplyCommand(connectionFd, 550, "Sorry, but that file doesn\'t exist.");
                 }
             }
             else if (command == RntoCommand)
@@ -317,7 +317,20 @@ void HandlerEntry(int connectionFd, const char *rootPath)
         }
         case WaitingForRenameTo:
         {
-            // TODO
+            if(command == RntoCommand) 
+            {
+                char newPath[pathSize];
+                strcpy(newPath, currentPath);
+                RntoCommandParser(incomingCommand, buffer);
+                ChangeDirectory(buffer, newPath);
+
+                // TODO
+            }
+            else
+            {
+                ReplyCommand(connectionFd, 503, "Bad sequence.");
+                clientState = WaitingForCommand;
+            }
             break;
         }
         case ReceivedPassive:
