@@ -131,7 +131,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             else if (command == PortCommand)
             {
                 int clientAddressLength;
-                PortCommandParser(incomingCommand, (struct sockaddr *)&clientAddress, clientAddressLength);
+                PortCommandParser(incomingCommand, (struct sockaddr *)&clientAddress, &clientAddressLength);
 
                 ReplyCommand(connectionFd, 200, "PORT command successful.");
                 clientState = ReceivedPort;
@@ -174,7 +174,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 sprintf(buffer, "Entering Passive Mode (%s)", ipAddress);
                 ReplyCommand(connectionFd, 227, buffer);
 
-                ClientState = ReceivedPassive;
+                clientState = ReceivedPassive;
             }
             else if (command == MkdCommand)
             {
@@ -358,8 +358,49 @@ void ReplyCommand(int connectionFd, int statusCode, char *message)
 
 bool VerifyUser(char *userName, char *password)
 {
-    // TODO complete this function
-    return true;
+    if (strcmp(userName, "anonymous") == 0)
+        return true;
+
+    FILE *fp = fopen("./auth.txt", "r");
+    if (fp == NULL)
+        return false;
+    int read;
+    size_t len;
+    char *line = NULL;
+    bool ret = false;
+    while ((read = getline(&line, &len, fp)) != -1)
+    {
+        char lineCopy[1024];
+        strcpy(lineCopy, line);
+        int i = 0;
+        while (lineCopy[i] != '\n' && lineCopy[i] != '\r')
+            i++;
+        lineCopy[i] = 0;
+        if (strcmp(lineCopy, userName) == 0)
+        {
+            getline(&line, &len, fp);
+            char passwordBuf[1024];
+            strcpy(passwordBuf, line);
+            i = 0;
+            while (passwordBuf[i] != '\n' && passwordBuf[i] != '\r')
+                i++;
+            passwordBuf[i] = 0;
+            if (strcmp(passwordBuf, password) == 0)
+                ret = true;
+            else
+                ret = false;
+            break;
+        }
+        else
+        {
+            getline(&line, &len, fp);
+        }
+    }
+
+    fclose(fp);
+    if (line)
+        free(line);
+    return ret;
 }
 
 bool IsSimpleCommand(enum ClientCommand command)
