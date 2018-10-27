@@ -1,6 +1,8 @@
 #include "Common.h"
 #include "FileSystem.h"
 
+// if `append` is absolute, put simplified `append` in `origin`;
+// if `append` is relative, put simplified `origin`/`append` in `origin`
 void ChangeDirectory(char *append, char *origin)
 {
     if (append[0] == '/')

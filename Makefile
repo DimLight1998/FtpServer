@@ -1,2 +1,2 @@
 build:
-	gcc Entry.c Connection.c CommandParsers.c FileSystem.c -o server -pthread -Wall -Werror
+	gcc Entry.c Connection.c CommandParsers.c FileSystem.c Environment.c -o server -pthread -Wall -Werror

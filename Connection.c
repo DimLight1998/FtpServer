@@ -2,6 +2,7 @@
 #include "Connection.h"
 #include "CommandParsers.h"
 #include "FileSystem.h"
+#include "Environment.h"
 
 void *ConnectionHandler(void *arg)
 {
@@ -20,6 +21,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
     char currentPath[pathSize];
     memset(currentPath, 0, pathSize);
     currentPath[0] = '/';
+    char renameFrom[2 * pathSize];
 
     ReplyCommand(connectionFd, 200, "Welcome to YGGUB FTP server!");
     const int maxCommandLength = 4096;
@@ -30,6 +32,11 @@ void HandlerEntry(int connectionFd, const char *rootPath)
     // this buffer will be used in many places
     char buffer[2 * maxCommandLength];
     enum ClientState clientState = WaitingForInputUserName;
+
+    int passiveSocketFd;
+    bool passiveSocketBinded = false;
+
+    struct sockaddr_in clientAddress;
 
     while (true)
     {
@@ -115,20 +122,59 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             }
             else if (command == RetrCommand)
             {
-                // TODO
+                ReplyCommand(connectionFd, 425, "No data connection.");
             }
             else if (command == StorCommand)
             {
-                // TODO
+                ReplyCommand(connectionFd, 425, "No data connection.");
             }
             else if (command == PortCommand)
             {
-                // TODO
+                int clientAddressLength;
+                PortCommandParser(incomingCommand, (struct sockaddr *)&clientAddress, clientAddressLength);
+
+                ReplyCommand(connectionFd, 200, "PORT command successful.");
+                clientState = ReceivedPort;
             }
             else if (command == PasvCommand)
             {
                 // in this case, we need to get local ip and a valid port
-                // TODO
+                if (passiveSocketBinded)
+                    close(passiveSocketFd);
+
+                GetLocalIp(buffer);
+                for (int i = 0; i < strlen(buffer); i++)
+                    if (buffer[i] == '.')
+                        buffer[i] = ',';
+                char ipAddress[64];
+                memset(ipAddress, 0, sizeof(ipAddress));
+                strcpy(ipAddress, buffer);
+
+                passiveSocketFd = socket(AF_INET, SOCK_STREAM, 0);
+                struct sockaddr_in dataAddress;
+                memset(&dataAddress, 0, sizeof(dataAddress));
+                dataAddress.sin_family = AF_INET;
+                dataAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+                dataAddress.sin_port = htons(0);
+                bind(passiveSocketFd, (struct sockaddr *)&dataAddress, sizeof(dataAddress));
+                passiveSocketBinded = true;
+
+                int dataPort = 0;
+                while (dataPort == 0)
+                {
+                    struct sockaddr_in dataAddressOut;
+                    socklen_t sockLen;
+                    getsockname(passiveSocketFd, (struct sockaddr *)&dataAddressOut, &sockLen);
+                    dataPort = dataAddressOut.sin_port;
+                }
+
+                int bigPort = dataPort / 256;
+                int smallPort = dataPort % 256;
+                sprintf(ipAddress + strlen(ipAddress), ",%d,%d", bigPort, smallPort);
+                sprintf(buffer, "Entering Passive Mode (%s)", ipAddress);
+                ReplyCommand(connectionFd, 227, buffer);
+
+                ClientState = ReceivedPassive;
             }
             else if (command == MkdCommand)
             {
@@ -148,9 +194,6 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 strcpy(buffer, "mkdir ");
                 strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
 
-                printf("[DEBUG] running %s\n", buffer);
-                fflush(stdout);
-
                 int retVal = system(buffer);
                 if (retVal == 0)
                     ReplyCommand(connectionFd, 257, "Success");
@@ -169,9 +212,6 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 strcpy(testCommand, "test -d ");
                 strncpy(testCommand + strlen(testCommand), rootPath, strlen(rootPath) + 1);
                 strncpy(testCommand + strlen(testCommand), currentPath, strlen(currentPath) + 1);
-
-                printf("[DEBUG] running %s\n", testCommand);
-                fflush(stdout);
 
                 int retVal = system(testCommand);
                 if (retVal == 0)
@@ -193,19 +233,80 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             }
             else if (command == ListCommand)
             {
-                // TODO
+                ReplyCommand(connectionFd, 425, "No data connection.");
             }
             else if (command == RmdCommand)
             {
-                // TODO
+                char newPathRelative[pathSize];
+                strncpy(newPathRelative, currentPath, strlen(currentPath) + 1);
+
+                RmdCommandParser(incomingCommand, buffer);
+                ChangeDirectory(buffer, newPathRelative);
+
+                // now `newPathRelative` holds relative path
+                if (strcmp(newPathRelative, "/") == 0)
+                {
+                    ReplyCommand(connectionFd, 550, "No permission.");
+                    break;
+                }
+
+                char absolutePath[2 * pathSize];
+                memset(absolutePath, 0, sizeof(absolutePath));
+                strncpy(absolutePath, rootPath, strlen(rootPath) + 1);
+                strncpy(absolutePath + strlen(absolutePath), newPathRelative, strlen(newPathRelative) + 1);
+
+                memset(buffer, 0, sizeof(buffer));
+                strcpy(buffer, "test -d ");
+                strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
+
+                int retVal = system(buffer);
+
+                if (retVal != 0)
+                {
+                    ReplyCommand(connectionFd, 550, "No such directory.");
+                    break;
+                }
+
+                memset(buffer, 0, sizeof(buffer));
+                strcpy(buffer, "rm -d ");
+                strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
+
+                retVal = system(buffer);
+                if (retVal == 0)
+                    ReplyCommand(connectionFd, 250, "Directory successfully removed.");
+                else
+                    ReplyCommand(connectionFd, 550, "Directory not empty.");
             }
             else if (command == RnfrCommand)
             {
-                // TODO
+                char original[pathSize];
+                strcpy(original, currentPath);
+                RnfrCommandParser(incomingCommand, buffer);
+                ChangeDirectory(buffer, original);
+
+                // check if is a file/directory
+                char testCommand[2 * pathSize];
+                memset(testCommand, 0, sizeof(testCommand));
+                strcpy(testCommand, "test -e ");
+                strncpy(testCommand + strlen(testCommand), rootPath, strlen(rootPath) + 1);
+                strncpy(testCommand + strlen(testCommand), original, strlen(original) + 1);
+
+                int retVal = system(testCommand);
+                if(retVal == 0)
+                {
+                    ReplyCommand(connectionFd, 350, "RNFR accepted.");
+                    strncpy(renameFrom, rootPath, strlen(rootPath) + 1);
+                    strncpy(renameFrom + strlen(renameFrom), original, strlen(original) + 1);
+                    clientState = WaitingForRenameTo;
+                }
+                else
+                {
+                    ReplyCommand()
+                }
             }
             else if (command == RntoCommand)
             {
-                // TODO
+                ReplyCommand(connectionFd, 503, "Need RNFR before RNTO.");
             }
             else
             {
