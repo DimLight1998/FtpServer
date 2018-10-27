@@ -191,8 +191,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 strncpy(absolutePath + strlen(absolutePath), newPathRelative, strlen(newPathRelative) + 1);
 
                 memset(buffer, 0, sizeof(buffer));
-                strcpy(buffer, "mkdir ");
-                strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
+                sprintf(buffer, "mkdir \"%s\"", absolutePath);
 
                 int retVal = system(buffer);
                 if (retVal == 0)
@@ -209,9 +208,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
                 char testCommand[2 * pathSize];
                 memset(testCommand, 0, sizeof(testCommand));
-                strcpy(testCommand, "test -d ");
-                strncpy(testCommand + strlen(testCommand), rootPath, strlen(rootPath) + 1);
-                strncpy(testCommand + strlen(testCommand), currentPath, strlen(currentPath) + 1);
+                sprintf(testCommand, "test -d \"%s%s\"", rootPath, currentPath);
 
                 int retVal = system(testCommand);
                 if (retVal == 0)
@@ -256,8 +253,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 strncpy(absolutePath + strlen(absolutePath), newPathRelative, strlen(newPathRelative) + 1);
 
                 memset(buffer, 0, sizeof(buffer));
-                strcpy(buffer, "test -d ");
-                strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
+                sprintf(buffer, "test -d \"%s\"", absolutePath);
 
                 int retVal = system(buffer);
 
@@ -268,8 +264,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 }
 
                 memset(buffer, 0, sizeof(buffer));
-                strcpy(buffer, "rm -d ");
-                strncpy(buffer + strlen(buffer), absolutePath, strlen(absolutePath) + 1);
+                sprintf(buffer, "rm -d \"%s\"", absolutePath);
 
                 retVal = system(buffer);
                 if (retVal == 0)
@@ -287,12 +282,10 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 // check if is a file/directory
                 char testCommand[2 * pathSize];
                 memset(testCommand, 0, sizeof(testCommand));
-                strcpy(testCommand, "test -e ");
-                strncpy(testCommand + strlen(testCommand), rootPath, strlen(rootPath) + 1);
-                strncpy(testCommand + strlen(testCommand), original, strlen(original) + 1);
+                sprintf(testCommand, "test -e \"%s%s\"", rootPath, original);
 
                 int retVal = system(testCommand);
-                if(retVal == 0)
+                if (retVal == 0)
                 {
                     ReplyCommand(connectionFd, 350, "RNFR accepted.");
                     strncpy(renameFrom, rootPath, strlen(rootPath) + 1);
@@ -317,14 +310,21 @@ void HandlerEntry(int connectionFd, const char *rootPath)
         }
         case WaitingForRenameTo:
         {
-            if(command == RntoCommand) 
+            if (command == RntoCommand)
             {
                 char newPath[pathSize];
                 strcpy(newPath, currentPath);
                 RntoCommandParser(incomingCommand, buffer);
                 ChangeDirectory(buffer, newPath);
 
-                // TODO
+                memset(buffer, 0, sizeof(buffer));
+                sprintf(buffer, "mv \"%s\" \"%s\"", renameFrom, newPath);
+                int retVal = system(buffer);
+                if (retVal == 0)
+                    ReplyCommand(connectionFd, 250, "File successfully renamed.");
+                else
+                    ReplyCommand(connectionFd, 451, "Rename/move failed.");
+                clientState = WaitingForCommand;
             }
             else
             {
