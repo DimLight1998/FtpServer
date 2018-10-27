@@ -39,6 +39,8 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
     struct sockaddr_in clientAddress;
 
+    int position = 0;
+
     while (true)
     {
         enum ClientCommand command = GetNextCommand(connectionFd, incomingCommand, maxCommandLength);
@@ -303,6 +305,10 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             {
                 ReplyCommand(connectionFd, 503, "Need RNFR before RNTO.");
             }
+            else if (command == RestCommand)
+            {
+                ReplyCommand(connectionFd, 425, "No data connection.");
+            }
             else
             {
                 ReplyCommand(connectionFd, 500, "Unknown command.");
@@ -367,14 +373,17 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
                 char readingBuffer[1024];
                 FILE *file = fopen(buffer, "w+");
+                int fileNo = fileno(file);
+                lseek(fileNo, position, SEEK_SET);
                 int readSize;
                 while ((readSize = read(dataConnectionFd, readingBuffer, sizeof(readingBuffer))) > 0)
                 {
-                    write(fileno(file), readingBuffer, readSize);
+                    write(fileNo, readingBuffer, readSize);
                 }
                 fclose(file);
                 close(dataConnectionFd);
                 passiveSocketBinded = false;
+                position = 0;
                 ReplyCommand(connectionFd, 226, "Transmission done.");
             }
             else if (command == RetrCommand)
@@ -390,15 +399,24 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
                 char readingBuffer[1024];
                 FILE *file = fopen(buffer, "r");
+                int fileNo = fileno(file);
+                lseek(fileNo, position, SEEK_SET);
                 int readSize;
-                while ((readSize = read(fileno(file), readingBuffer, sizeof(readingBuffer))) > 0)
+                while ((readSize = read(fileNo, readingBuffer, sizeof(readingBuffer))) > 0)
                 {
                     write(dataConnectionFd, readingBuffer, readSize);
                 }
                 fclose(file);
                 close(dataConnectionFd);
+                position = 0;
                 passiveSocketBinded = false;
                 ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else if (command == RestCommand)
+            {
+                RestCommandParser(incomingCommand, &position);
+                ReplyCommand(connectionFd, 350, "REST ok.");
+                break;
             }
             else
             {
@@ -444,13 +462,16 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
                 char readingBuffer[1024];
                 FILE *file = fopen(buffer, "w+");
+                int fileNo = fileno(file);
+                lseek(fileNo, position, SEEK_SET);
                 int readSize;
                 while ((readSize = read(dataConnectionFd, readingBuffer, sizeof(readingBuffer))) > 0)
                 {
-                    write(fileno(file), readingBuffer, readSize);
+                    write(fileNo, readingBuffer, readSize);
                 }
                 fclose(file);
                 close(dataConnectionFd);
+                position = 0;
                 ReplyCommand(connectionFd, 226, "Transmission done.");
             }
             else if (command == RetrCommand)
@@ -467,14 +488,23 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
                 char readingBuffer[1024];
                 FILE *file = fopen(buffer, "r");
+                int fileNo = fileno(file);
+                lseek(fileNo, position, SEEK_SET);
                 int readSize;
-                while ((readSize = read(fileno(file), readingBuffer, sizeof(readingBuffer))) > 0)
+                while ((readSize = read(fileNo, readingBuffer, sizeof(readingBuffer))) > 0)
                 {
                     write(dataConnectionFd, readingBuffer, readSize);
                 }
                 fclose(file);
                 close(dataConnectionFd);
+                position = 0;
                 ReplyCommand(connectionFd, 226, "Transmission done.");
+            }
+            else if (command == RestCommand)
+            {
+                RestCommandParser(incomingCommand, &position);
+                ReplyCommand(connectionFd, 350, "REST ok.");
+                break;
             }
             else
             {
@@ -623,5 +653,7 @@ enum ClientCommand GetNextCommand(int connectionFd, char *commandBuffer, int buf
         return RnfrCommand;
     if (strncmp("RNTO", commandBuffer, 4) == 0 && isspace(commandBuffer[4]))
         return RntoCommand;
+    if (strncmp("REST", commandBuffer, 4) == 0 && isspace(commandBuffer[4]))
+        return RestCommand;
     return Unknown;
 }

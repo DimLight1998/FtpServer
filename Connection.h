@@ -35,6 +35,7 @@ enum ClientCommand
     RmdCommand,
     RnfrCommand,
     RntoCommand,
+    RestCommand,
     Unknown
 };
 

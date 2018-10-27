@@ -79,7 +79,7 @@ void ListFolder(char *realPath, char *buffer)
     buffer[0] = 0;
     char command[2048];
     memset(command, 0, sizeof(command));
-    sprintf(command, "ls -l %s", realPath);
+    sprintf(command, "ls -al %s", realPath);
     FILE *fp = popen(command, "r");
     char line[1024];
     while (fgets(line, sizeof(line), fp) != NULL)

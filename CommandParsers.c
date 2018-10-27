@@ -140,6 +140,21 @@ void RntoCommandParser(char *command, char *pathName)
     PathParser(command + 4, pathName);
 }
 
+void RestCommandParser(char *command, int *size)
+{
+    int current = 4;
+    while (command[current] != '\r' && command[current] != '\n' && isspace(command[current]))
+        current++;
+    int begin = current;
+    while (!isspace(command[current]))
+        current++;
+    int length = current - begin;
+    char buf[1024];
+    strncpy(buf, command + begin, length);
+    buf[length] = 0;
+    *size = atoi(buf);
+}
+
 bool IsCrLf(char c)
 {
     return c == '\n' || c == '\r';

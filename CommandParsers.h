@@ -16,6 +16,7 @@ void ListCommandParser(char *command, char *pathName);
 void RmdCommandParser(char *command, char *pathName);
 void RnfrCommandParser(char *command, char *pathName);
 void RntoCommandParser(char *command, char *pathName);
+void RestCommandParser(char *command, int* size);
 bool IsCrLf(char c);
 void PathParser(char *potential, char *pathName);
 
