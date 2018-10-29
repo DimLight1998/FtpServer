@@ -84,9 +84,19 @@ void ListFolder(char *realPath, char *buffer)
     char line[1024];
     while (fgets(line, sizeof(line), fp) != NULL)
         strncpy(buffer + strlen(buffer), line, strlen(line) + 1);
+
+    // the first line of `buffer` contains text like 'total 28K', remove the first line
+    char tempBuffer[32 * 1024];
+    strcpy(tempBuffer, buffer);
+    int current = 0;
+    while (tempBuffer[current] != '\r' && tempBuffer[current] != '\n')
+        current++;
+    while (tempBuffer[current] == '\r' || tempBuffer[current] == '\n')
+        current++;
+    strcpy(buffer, tempBuffer + current);
 }
 
-void GetPathRelativeToRoot(char* currentPath, char* pathRelativeToCurrent, char* out)
+void GetPathRelativeToRoot(char *currentPath, char *pathRelativeToCurrent, char *out)
 {
     char buffer[4096];
     strcpy(buffer, currentPath);

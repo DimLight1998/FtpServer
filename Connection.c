@@ -23,7 +23,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
     currentPath[0] = '/';
     char renameFrom[2 * pathSize];
 
-    ReplyCommand(connectionFd, 200, "Welcome to YGGUB FTP server!");
+    ReplyCommand(connectionFd, 220, "Welcome to YGGUB FTP server!");
     const int maxCommandLength = 4096;
 
     char incomingCommand[maxCommandLength];
@@ -195,7 +195,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 strncpy(absolutePath + strlen(absolutePath), newPathRelative, strlen(newPathRelative) + 1);
 
                 memset(buffer, 0, sizeof(buffer));
-                sprintf(buffer, "mkdir \"%s\"", absolutePath);
+                sprintf(buffer, "mkdir \"%s\" 2>/dev/null", absolutePath);
 
                 int retVal = system(buffer);
                 if (retVal == 0)
@@ -212,7 +212,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
 
                 char testCommand[2 * pathSize];
                 memset(testCommand, 0, sizeof(testCommand));
-                sprintf(testCommand, "test -d \"%s%s\"", rootPath, currentPath);
+                sprintf(testCommand, "test -d \"%s%s\" 2>/dev/null", rootPath, currentPath);
 
                 int retVal = system(testCommand);
                 if (retVal == 0)
@@ -230,7 +230,8 @@ void HandlerEntry(int connectionFd, const char *rootPath)
             }
             else if (command == PwdCommand)
             {
-                ReplyCommand(connectionFd, 257, currentPath);
+                sprintf(buffer, "\"%s\" is your current path.", currentPath);
+                ReplyCommand(connectionFd, 257, buffer);
             }
             else if (command == ListCommand)
             {
@@ -257,7 +258,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 strncpy(absolutePath + strlen(absolutePath), newPathRelative, strlen(newPathRelative) + 1);
 
                 memset(buffer, 0, sizeof(buffer));
-                sprintf(buffer, "test -d \"%s\"", absolutePath);
+                sprintf(buffer, "test -d \"%s\" 2>/dev/null", absolutePath);
 
                 int retVal = system(buffer);
 
@@ -268,7 +269,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 }
 
                 memset(buffer, 0, sizeof(buffer));
-                sprintf(buffer, "rm -d \"%s\"", absolutePath);
+                sprintf(buffer, "rm -d \"%s\" 2>/dev/null", absolutePath);
 
                 retVal = system(buffer);
                 if (retVal == 0)
@@ -286,7 +287,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 // check if is a file/directory
                 char testCommand[2 * pathSize];
                 memset(testCommand, 0, sizeof(testCommand));
-                sprintf(testCommand, "test -e \"%s%s\"", rootPath, original);
+                sprintf(testCommand, "test -e \"%s%s\" 2>/dev/null", rootPath, original);
 
                 int retVal = system(testCommand);
                 if (retVal == 0)
@@ -326,7 +327,7 @@ void HandlerEntry(int connectionFd, const char *rootPath)
                 ChangeDirectory(buffer, newPath);
 
                 memset(buffer, 0, sizeof(buffer));
-                sprintf(buffer, "mv \"%s\" \"%s\"", renameFrom, newPath);
+                sprintf(buffer, "mv \"%s\" \"%s%s\" 2>/dev/null", renameFrom, rootPath, newPath);
                 int retVal = system(buffer);
                 if (retVal == 0)
                     ReplyCommand(connectionFd, 250, "File successfully renamed.");
