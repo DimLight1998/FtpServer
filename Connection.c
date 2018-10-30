@@ -596,7 +596,7 @@ void HandleSimpleCommand(enum ClientCommand command, char *commandDetail, int co
         bool isBinary;
         TypeCommandParser(commandDetail, &isBinary);
         if (isBinary)
-            ReplyCommand(connectionFd, 200, "Type is now 8 bit binary.");
+            ReplyCommand(connectionFd, 200, "Type set to I.");
         else
             ReplyCommand(connectionFd, 504, "Unknown type.");
     }
